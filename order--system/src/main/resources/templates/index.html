@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>电商订单系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            font-size: 2.4em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .subtitle {
+            text-align: center;
+            color: #eaf0ff;
+            margin-bottom: 28px;
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 20px;
+        }
+        .menu-card {
+            background: white;
+            border-radius: 14px;
+            padding: 28px;
+            box-shadow: 0 10px 26px rgba(0,0,0,0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .menu-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 14px 30px rgba(0,0,0,0.24);
+        }
+        .menu-card h2 {
+            color: #222;
+            margin-bottom: 12px;
+            font-size: 1.45em;
+        }
+        .menu-card p {
+            color: #555;
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+        .btn {
+            display: inline-block;
+            padding: 11px 22px;
+            border-radius: 22px;
+            text-decoration: none;
+            color: white;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .btn-success { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+        .btn-info { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .btn-warning { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); }
+
+        .status-bar {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 26px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        }
+        .status-bar h3 {
+            color: #333;
+            margin-bottom: 12px;
+        }
+        .status-item {
+            display: inline-block;
+            margin-right: 12px;
+            margin-bottom: 8px;
+            padding: 9px 16px;
+            background: #f0f0f0;
+            border-radius: 16px;
+        }
+        .status-item span {
+            font-weight: bold;
+            color: #4c60d8;
+        }
+        .log-box {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 14px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>电商订单系统</h1>
+    <p class="subtitle">基于生产者-消费者模型的多线程订单处理演示</p>
+
+    <div class="menu-grid">
+        <div class="menu-card">
+            <h2>商品管理</h2>
+            <p>添加、编辑、删除商品信息，操作通过异步任务执行。</p>
+            <a href="/product/list" class="btn btn-primary">进入商品管理</a>
+        </div>
+
+        <div class="menu-card">
+            <h2>创建订单</h2>
+            <p>选择商品创建订单，订单将由多个消费者线程并发处理。</p>
+            <a href="/order/create" class="btn btn-success">创建订单</a>
+        </div>
+
+        <div class="menu-card">
+            <h2>订单列表</h2>
+            <p>查看订单状态、处理线程和时间信息，支持分页浏览。</p>
+            <a href="/order/list" class="btn btn-info">查看订单</a>
+        </div>
+
+        <div class="menu-card">
+            <h2>确认收货</h2>
+            <p>查看已发货订单并确认收货，列表支持每页 20 条翻页。</p>
+            <button onclick="showReceiveDialog()" class="btn btn-warning">确认收货</button>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <h3>系统运行状态</h3>
+        <div class="status-item">商品队列大小: <span id="productQueue">0</span></div>
+        <div class="status-item">商品已处理: <span id="productProcessed">0</span></div>
+        <div class="status-item">订单队列大小: <span id="orderQueue">0</span></div>
+        <div class="status-item">订单已处理: <span id="orderProcessed">0</span></div>
+
+        <div style="margin-top: 16px; border-top: 1px solid #e0e0e0; padding-top: 16px;">
+            <h3>订单处理日志</h3>
+            <div class="log-box">
+                <div id="logContainer"></div>
+            </div>
+            <div style="margin-top: 10px; text-align: right;">
+                <button onclick="clearLogs()" class="btn" style="background: #6c757d;">清空日志</button>
+                <button onclick="scrollToBottom()" class="btn" style="background: #6c757d; margin-left: 8px;">滚动到底部</button>
+                <button onclick="showCancelDialog()" class="btn" style="background: #dc3545; margin-left: 8px;">取消未完成订单</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let logContainer = document.getElementById('logContainer');
+    let receiveDialogRef = null;
+    let receiveCurrentPage = 0;
+    const RECEIVE_PAGE_SIZE = 20;
+
+    function updateStatus() {
+        fetch('/product/status')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('productQueue').textContent = data.queueSize;
+                document.getElementById('productProcessed').textContent = data.processedCount;
+            });
+
+        fetch('/order/status')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('orderQueue').textContent = data.queueSize;
+                document.getElementById('orderProcessed').textContent = data.processedCount;
+            });
+    }
+
+    function updateLogs() {
+        fetch('/log/recent?count=100')
+            .then(r => r.json())
+            .then(data => {
+                let logHtml = '';
+                data.logs.forEach(log => {
+                    let line = log;
+                    if (line.includes('[PRODUCER]')) {
+                        line = '<span style="color:#28a745;">' + line + '</span>';
+                    } else if (line.includes('[THREAD-1]')) {
+                        line = '<span style="color:#dc3545;">' + line + '</span>';
+                    } else if (line.includes('[THREAD-2]')) {
+                        line = '<span style="color:#007bff;">' + line + '</span>';
+                    } else if (line.includes('[THREAD-3]')) {
+                        line = '<span style="color:#ffc107;">' + line + '</span>';
+                    } else if (line.includes('[SYSTEM]')) {
+                        line = '<span style="color:#6c757d;">' + line + '</span>';
+                    }
+                    logHtml += line + '<br>';
+                });
+                logContainer.innerHTML = logHtml;
+                scrollToBottom();
+            });
+    }
+
+    function clearLogs() {
+        if (!confirm('确定要清空日志吗？')) return;
+        fetch('/log/clear', {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    logContainer.innerHTML = '';
+                }
+            });
+    }
+
+    function scrollToBottom() {
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function createDialog(title) {
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:flex;justify-content:center;align-items:center;z-index:1000;';
+        const content = document.createElement('div');
+        content.style.cssText = 'background:white;padding:24px;border-radius:10px;width:90%;max-width:760px;max-height:80vh;overflow-y:auto;';
+        content.innerHTML = `
+            <h3 style="margin-bottom:16px;">${title}</h3>
+            <div class="dialog-body"></div>
+            <div style="margin-top:16px;text-align:right;">
+                <button class="dialog-close btn" style="background:#6c757d;">关闭</button>
+            </div>
+        `;
+        dialog.appendChild(content);
+        document.body.appendChild(dialog);
+        content.querySelector('.dialog-close').addEventListener('click', () => document.body.removeChild(dialog));
+        return {dialog, body: content.querySelector('.dialog-body')};
+    }
+
+    function showReceiveDialog(page = 0) {
+        if (receiveDialogRef && document.body.contains(receiveDialogRef)) {
+            document.body.removeChild(receiveDialogRef);
+            receiveDialogRef = null;
+        }
+        receiveCurrentPage = page;
+
+        const box = createDialog('确认收货');
+        receiveDialogRef = box.dialog;
+
+        fetch(`/order/shipped?page=${page}&size=${RECEIVE_PAGE_SIZE}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success || !data.orders || data.orders.length === 0) {
+                    box.body.innerHTML = '<p style="text-align:center;color:#666;">暂无已发货订单</p>';
+                    return;
+                }
+
+                let html = '<table style="width:100%;border-collapse:collapse;margin-bottom:14px;">';
+                html += '<tr style="background:#f5f5f5;"><th style="padding:8px;border:1px solid #ddd;">订单号</th><th style="padding:8px;border:1px solid #ddd;">商品</th><th style="padding:8px;border:1px solid #ddd;">价格</th><th style="padding:8px;border:1px solid #ddd;">操作</th></tr>';
+                data.orders.forEach(o => {
+                    html += `<tr>
+                        <td style="padding:8px;border:1px solid #ddd;">${o.orderNo}</td>
+                        <td style="padding:8px;border:1px solid #ddd;">${o.productName}</td>
+                        <td style="padding:8px;border:1px solid #ddd;">￥${o.price}</td>
+                        <td style="padding:8px;border:1px solid #ddd;"><button class="receive-btn btn" data-id="${o.id}" style="padding:5px 10px;background:#28a745;border-radius:4px;">确认收货</button></td>
+                    </tr>`;
+                });
+                html += '</table>';
+                const current = (data.currentPage || 0) + 1;
+                const total = data.totalPages || 1;
+                html += `
+                    <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;">
+                        <button class="page-prev btn" ${current > 1 ? '' : 'disabled'} style="padding:6px 10px;background:#6c757d;border-radius:4px;">上一页</button>
+                        <span style="color:#666;">第 ${current} / ${total} 页</span>
+                        <button class="page-next btn" ${current < total ? '' : 'disabled'} style="padding:6px 10px;background:#6c757d;border-radius:4px;">下一页</button>
+                    </div>`;
+                box.body.innerHTML = html;
+
+                box.body.querySelectorAll('.receive-btn').forEach(btn => {
+                    btn.addEventListener('click', () => confirmReceive(Number(btn.dataset.id)));
+                });
+                const prev = box.body.querySelector('.page-prev');
+                const next = box.body.querySelector('.page-next');
+                if (prev) prev.addEventListener('click', () => showReceiveDialog(Math.max((data.currentPage || 0) - 1, 0)));
+                if (next) next.addEventListener('click', () => showReceiveDialog((data.currentPage || 0) + 1));
+            });
+    }
+
+    function confirmReceive(orderId) {
+        fetch('/order/confirm-receive', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `orderId=${orderId}`
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    setTimeout(() => showReceiveDialog(receiveCurrentPage), 150);
+                } else if (data.message) {
+                    alert(data.message);
+                }
+            });
+    }
+
+    function showCancelDialog() {
+        const box = createDialog('取消未完成订单');
+        fetch('/order/pending')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success || !data.orders || data.orders.length === 0) {
+                    box.body.innerHTML = '<p style="text-align:center;color:#666;">暂无未完成订单</p>';
+                    return;
+                }
+
+                let html = '<table style="width:100%;border-collapse:collapse;margin-bottom:14px;">';
+                html += '<tr style="background:#f5f5f5;"><th style="padding:8px;border:1px solid #ddd;">订单号</th><th style="padding:8px;border:1px solid #ddd;">商品</th><th style="padding:8px;border:1px solid #ddd;">价格</th><th style="padding:8px;border:1px solid #ddd;">状态</th><th style="padding:8px;border:1px solid #ddd;">操作</th></tr>';
+                data.orders.forEach(o => {
+                    html += `<tr>
+                        <td style="padding:8px;border:1px solid #ddd;">${o.orderNo}</td>
+                        <td style="padding:8px;border:1px solid #ddd;">${o.productName}</td>
+                        <td style="padding:8px;border:1px solid #ddd;">￥${o.price}</td>
+                        <td style="padding:8px;border:1px solid #ddd;">${o.status}</td>
+                        <td style="padding:8px;border:1px solid #ddd;"><button class="cancel-btn btn" data-no="${o.orderNo}" style="padding:5px 10px;background:#dc3545;border-radius:4px;">取消订单</button></td>
+                    </tr>`;
+                });
+                html += '</table>';
+                box.body.innerHTML = html;
+
+                box.body.querySelectorAll('.cancel-btn').forEach(btn => {
+                    btn.addEventListener('click', () => cancelOrder(btn.dataset.no, box.dialog));
+                });
+            });
+    }
+
+    function cancelOrder(orderNo, dialog) {
+        if (!confirm('确定要取消订单吗？')) return;
+        fetch('/log/cancel', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `orderNo=${orderNo}`
+        })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message);
+                if (data.success && dialog && document.body.contains(dialog)) {
+                    document.body.removeChild(dialog);
+                    showCancelDialog();
+                }
+            });
+    }
+
+    setInterval(updateStatus, 1000);
+    setInterval(updateLogs, 1000);
+    updateStatus();
+    updateLogs();
+</script>
+</body>
+</html>

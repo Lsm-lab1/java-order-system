@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>商品管理</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .btn-add { background: #28a745; color: white; }
+        .btn-edit { background: #007bff; color: white; }
+        .btn-delete { background: #dc3545; color: white; }
+        .btn-back { background: #6c757d; color: white; }
+        .btn:hover { opacity: 0.8; transform: scale(1.05); }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        tr:hover { background: #f5f5f5; }
+        .empty {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+        .status-bar {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .status-item {
+            display: inline-block;
+            margin-right: 20px;
+            font-weight: bold;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 400px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>商品管理</h1>
+        
+        <div class="status-bar">
+            <span class="status-item">商品队列: <span id="queueSize">0</span></span>
+            <span class="status-item">已处理: <span id="processedCount">0</span></span>
+        </div>
+        
+        <div>
+            <button class="btn btn-add" onclick="showModal()">+ 添加商品</button>
+            <a href="/" class="btn btn-back">返回首页</a>
+        </div>
+        
+        <table th:if="${!products.isEmpty()}">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>商品名称</th>
+                    <th>商品类型</th>
+                    <th>价格</th>
+                    <th>库存</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="p : ${products}">
+                    <td th:text="${p.id}"></td>
+                    <td th:text="${p.productName}"></td>
+                    <td th:text="${p.productType}"></td>
+                    <td th:text="'¥' + ${p.price}"></td>
+                    <td th:text="${p.stock}"></td>
+                    <td th:text="${p.createTime}"></td>
+                    <td>
+                        <button class="btn btn-edit" th:onclick="'editProduct(' + ${p.id} + ')'">编辑</button>
+                        <button class="btn btn-delete" th:onclick="'deleteProduct(' + ${p.id} + ')'">删除</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div th:if="${products.isEmpty()}" class="empty">
+            <p>暂无商品，请点击"添加商品"按钮创建</p>
+        </div>
+    </div>
+    
+    <div id="productModal" class="modal">
+        <div class="modal-content">
+            <h2 id="modalTitle">添加商品</h2>
+            <form id="productForm">
+                <input type="hidden" id="productId">
+                <div class="form-group">
+                    <label>商品名称</label>
+                    <input type="text" id="productName" required>
+                </div>
+                <div class="form-group">
+                    <label>商品类型</label>
+                    <input type="text" id="productType" required placeholder="如：电子、服装、食品">
+                </div>
+                <div class="form-group">
+                    <label>价格</label>
+                    <input type="number" id="price" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>库存</label>
+                    <input type="number" id="stock" required>
+                </div>
+                <button type="submit" class="btn btn-add">保存</button>
+                <button type="button" class="btn btn-back" onclick="hideModal()">取消</button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        let editingId = null;
+        
+        function showModal() {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = '添加商品';
+            document.getElementById('productForm').reset();
+            document.getElementById('productModal').style.display = 'flex';
+        }
+        
+        function hideModal() {
+            document.getElementById('productModal').style.display = 'none';
+        }
+        
+        function editProduct(id) {
+            editingId = id;
+            document.getElementById('modalTitle').textContent = '编辑商品';
+            document.getElementById('productId').value = id;
+            
+            const row = event.target.closest('tr');
+            document.getElementById('productName').value = row.cells[1].textContent;
+            document.getElementById('productType').value = row.cells[2].textContent;
+            document.getElementById('price').value = row.cells[3].textContent.replace('¥', '');
+            document.getElementById('stock').value = row.cells[4].textContent;
+            
+            document.getElementById('productModal').style.display = 'flex';
+        }
+        
+        function deleteProduct(id) {
+            if (!confirm('确定要删除该商品吗？')) return;
+            
+            fetch('/product/delete/' + id, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message);
+                    if (data.success) location.reload();
+                });
+        }
+        
+        document.getElementById('productForm').onsubmit = function(e) {
+            e.preventDefault();
+            
+            const data = new URLSearchParams();
+            data.append('productName', document.getElementById('productName').value);
+            data.append('productType', document.getElementById('productType').value);
+            data.append('price', document.getElementById('price').value);
+            data.append('stock', document.getElementById('stock').value);
+            
+            const url = editingId ? '/product/update' : '/product/save';
+            if (editingId) data.append('id', editingId);
+            
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: data
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message);
+                if (data.success) {
+                    hideModal();
+                    location.reload();
+                }
+            });
+        };
+        
+        function updateStatus() {
+            fetch('/product/status')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('queueSize').textContent = data.queueSize;
+                    document.getElementById('processedCount').textContent = data.processedCount;
+                });
+        }
+        
+        setInterval(updateStatus, 1000);
+        updateStatus();
+    </script>
+</body>
+</html>
